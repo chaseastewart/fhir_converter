@@ -6,7 +6,7 @@ from re import Match, Pattern
 from re import compile as re_compile
 from re import findall as re_findall
 from typing import Any, Callable, Final, Iterable, List, Mapping, Sequence, Tuple
-from uuid import UUID
+import uuid
 from zlib import compress as z_compress
 
 from dateutil import parser
@@ -227,7 +227,8 @@ def generate_uuid(data: str) -> str:
     """Generate a UUID using the sha256 hash of the given data string"""
     if is_undefined_none_or_blank(data):
         return ""
-    return str(UUID(bytes=sha256(data.encode()).digest()[:16]))
+    data = data.strip().replace("\r", "").replace("\n", "")
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, data))
 
 @string_filter
 def generate_id_input(data: str, resource_name:str ,based_id_required:bool,base_id:str = None) -> str:
