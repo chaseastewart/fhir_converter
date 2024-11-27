@@ -208,7 +208,7 @@ def to_fhir_dtm(dt: datetime, precision: Optional[FhirDtmPrecision] = None) -> s
         The ISO date time string
     """
     if precision is None:
-        precision = FhirDtmPrecision.SEC
+        precision = FhirDtmPrecision.DAY
     # TODO HOUR, MIN, SEC truncation
 
     iso_dtm, offset = dt.isoformat(timespec=precision.timespec), dt.utcoffset()
@@ -217,11 +217,8 @@ def to_fhir_dtm(dt: datetime, precision: Optional[FhirDtmPrecision] = None) -> s
 
     if offset is not None and precision > FhirDtmPrecision.DAY:
         return iso_dtm
-    elif precision > FhirDtmPrecision.MONTH:
-        return iso_dtm[: FhirDtmPrecision.DAY]
-    elif precision > FhirDtmPrecision.YEAR:
-        return iso_dtm[: FhirDtmPrecision.MONTH]
-    return iso_dtm[: FhirDtmPrecision.YEAR]
+
+    return iso_dtm[ : precision]
 
 def post_process_fhir(json_data: str) -> Any:
     """post_process_fhir Post processes the FHIR object
