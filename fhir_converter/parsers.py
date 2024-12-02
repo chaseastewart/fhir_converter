@@ -156,7 +156,8 @@ def parse_json(
     Returns:
         Any: the decoded output
     """
-    json = loads(_fix_commas(read_text(json_in, encoding)), loader=json5_skip_empty_loader)
+    loader = json5_skip_empty_loader if ignore_empty_fields else DefaultLoader()
+    json = loads(_fix_commas(read_text(json_in, encoding)), loader=loader)
     return _remove_empty_json(json) if ignore_empty_fields else json
 
 def _fix_commas(value: str) -> str:

@@ -12,7 +12,7 @@ from zlib import compress as z_compress
 from dateutil import parser
 from frozendict import frozendict
 from isodate import isotzinfo, parse_datetime
-from liquid import Environment
+from liquid import Environment, Undefined
 from liquid.builtin.filters.misc import date as liquid_date
 from liquid.context import Context
 from liquid.exceptions import FilterArgumentError
@@ -231,8 +231,15 @@ def generate_uuid(data: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, data))
 
 @string_filter
-def generate_id_input(data: str, resource_name:str ,based_id_required:bool,base_id:str = None) -> str:
+def generate_id_input(data: str, resource_name: str, based_id_required: bool, base_id: str = None) -> str:
     """Generates an input string for generate_uuid with 1) the resource type, 2) whether a base ID is required, 3) the base ID (optional)"""
+    if isinstance(resource_name, Undefined):
+        resource_name = ""
+    if isinstance(based_id_required, Undefined):
+        based_id_required = False
+    if isinstance(base_id, Undefined):
+        base_id = ""
+
     if based_id_required:
         return resource_name + data + base_id
     return resource_name + data

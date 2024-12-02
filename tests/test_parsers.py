@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest import TestCase
 
 from lxml import etree
-from pyjson5 import Json5EOF
+from json5 import JSON5DecodeError
 from pytest import raises
 
 from fhir_converter.parsers import ParseXmlOpts, parse_json, parse_xml, Hl7v2DataParser
@@ -13,24 +13,24 @@ class ParseJsonTest(TestCase):
     simple_file = Path("tests/data/simple.json")
 
     def test_empty_text(self) -> None:
-        with raises(Json5EOF):
+        with raises(JSON5DecodeError):
             parse_json("")
 
     def test_blank_text(self) -> None:
-        with raises(Json5EOF):
+        with raises(JSON5DecodeError):
             parse_json(" ")
 
     def test_empty_bytes(self) -> None:
-        with raises(Json5EOF):
+        with raises(JSON5DecodeError):
             parse_json(bytes())
 
     def test_empty_text_io(self) -> None:
-        with raises(Json5EOF):
+        with raises(JSON5DecodeError):
             with self.empty_file.open() as json_in:
                 parse_json(json_in)
 
     def test_empty_binary_io(self) -> None:
-        with raises(Json5EOF):
+        with raises(JSON5DecodeError):
             with self.empty_file.open("rb") as json_in:
                 parse_json(json_in)
 
@@ -117,6 +117,14 @@ class ParseJsonTest(TestCase):
             {"name": [{"family": "", "given": [""]}]},
             parse_json(
                 '{"name": [{"family": "","given": [""]}]}', ignore_empty_fields=False
+            ),
+        )
+
+    def test_include_empty_fields_nested(self) -> None:
+        self.assertEqual(
+            {},
+            parse_json(
+                '{"name": [{"family": "","given": [""]}]}', ignore_empty_fields=True
             ),
         )
 

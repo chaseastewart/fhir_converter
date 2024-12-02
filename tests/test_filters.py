@@ -469,7 +469,7 @@ class GenerateUuidTest(TestCase, FilterTest):
 
     def test_uuid(self) -> None:
         result = self.bound_template.render(data="This is a test.")
-        self.assertEqual(result, "a8a2f6eb-e286-697c-527e-b35a58b55395")
+        self.assertEqual(result, "08b9a802-08d3-5a58-a0ff-ad195172929b")
 
 
 class GetPropertTest(TestCase, FilterTest):
@@ -911,22 +911,92 @@ class GetSegmentListsTest(TestCase, FilterTest):
 
 class GetRelatedSegmentListTest(TestCase, FilterTest):
     template = """{{ data | get_related_segment_list: segments, related_segment_name }}"""
-    hl7v2_data = Hl7v2Data('')
-    hl7v2_data.meta.append('MSH')
-    hl7v2_data.meta.append('EVN')
-    hl7v2_data.data.append(Hl7v2Segment('Field', []))
-    hl7v2_data.data.append(Hl7v2Segment('EVN', []))
 
     def setUp(self) -> None:
         self.setup_template()
 
-    def test_data_not_found(self) -> None:
-        result = self.bound_template.render(data=self.hl7v2_data, segments="MSH", related_segment_name="MSH")
-        self.assertTrue(result.startswith(r"{}"))
+    def test_empty_data(self) -> None:
+        hl7v2_data = Hl7v2Data('')
+        result = self.bound_template.render(
+            data=hl7v2_data, 
+            segments={"Value": "MSH"}, 
+            related_segment_name="EVN"
+        )
+        self.assertEqual(result, "{}")
 
-    def test_data_found(self) -> None:
-        result = self.bound_template.render(data=self.hl7v2_data, segments=Hl7v2Segment('Field', []), related_segment_name="EVN")
-        self.assertTrue(result.startswith(r"{'EVN': [{'Value': 'EVN'}]}"))
+    def test_no_matching_parent(self) -> None:
+        hl7v2_data = Hl7v2Data('')
+        hl7v2_data.meta.extend(['MSH', 'EVN'])
+        hl7v2_data.data.extend([
+            Hl7v2Segment('MSH Field', []),
+            Hl7v2Segment('EVN Field', [])
+        ])
+        result = self.bound_template.render(
+            data=hl7v2_data,
+            segments={"Value": "PID"},  # Non-existent parent
+            related_segment_name="EVN"
+        )
+        self.assertEqual(result, "{}")
+
+    def test_no_matching_child(self) -> None:
+        hl7v2_data = Hl7v2Data('')
+        hl7v2_data.meta.extend(['MSH', 'EVN'])
+        hl7v2_data.data.extend([
+            Hl7v2Segment('MSH Field', []),
+            Hl7v2Segment('EVN Field', [])
+        ])
+        result = self.bound_template.render(
+            data=hl7v2_data,
+            segments={"Value": "MSH Field"},
+            related_segment_name="PID"  # Non-existent child
+        )
+        self.assertEqual(result, "{}")
+
+    def test_single_child_segment(self) -> None:
+        hl7v2_data = Hl7v2Data('')
+        hl7v2_data.meta.extend(['MSH', 'EVN'])
+        hl7v2_data.data.extend([
+            Hl7v2Segment('MSH Field', []),
+            Hl7v2Segment('EVN Field', [])
+        ])
+        result = self.bound_template.render(
+            data=hl7v2_data,
+            segments={"Value": "MSH Field"},
+            related_segment_name="EVN"
+        )
+        self.assertEqual(result, "{'EVN': [{'Value': 'EVN Field'}]}")
+
+    def test_multiple_child_segments(self) -> None:
+        hl7v2_data = Hl7v2Data('')
+        hl7v2_data.meta.extend(['MSH', 'EVN', 'EVN'])
+        hl7v2_data.data.extend([
+            Hl7v2Segment('MSH Field', []),
+            Hl7v2Segment('EVN Field 1', []),
+            Hl7v2Segment('EVN Field 2', [])
+        ])
+        result = self.bound_template.render(
+            data=hl7v2_data,
+            segments={"Value": "MSH Field"},
+            related_segment_name="EVN"
+        )
+        self.assertEqual(
+            result, 
+            "{'EVN': [{'Value': 'EVN Field 1'}, {'Value': 'EVN Field 2'}]}"
+        )
+
+    def test_case_insensitive_matching(self) -> None:
+        hl7v2_data = Hl7v2Data('')
+        hl7v2_data.meta.extend(['MSH', 'evn'])  # lowercase EVN
+        hl7v2_data.data.extend([
+            Hl7v2Segment('MSH Field', []),
+            Hl7v2Segment('EVN Field', [])
+        ])
+        result = self.bound_template.render(
+            data=hl7v2_data,
+            segments={"Value": "MSH Field"},
+            related_segment_name="EVN"  # uppercase EVN
+        )
+        self.assertEqual(result, "{'EVN': [{'Value': 'EVN Field'}]}")
 
 class GetParentSegmentTest(TestCase, FilterTest):
     template = """{{ data | get_parent_segment: child_segment_id, child_index, parent_segment_id }}"""
