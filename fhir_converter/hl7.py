@@ -209,16 +209,22 @@ def to_fhir_dtm(dt: datetime, precision: Optional[FhirDtmPrecision] = None) -> s
     """
     if precision is None:
         precision = FhirDtmPrecision.DAY
-    # TODO HOUR, MIN, SEC truncation
 
     iso_dtm, offset = dt.isoformat(timespec=precision.timespec), dt.utcoffset()
+
+    # if offset is zero, we must append Z instead of +00:00
     if offset == zero_time_delta:
         iso_dtm = iso_dtm[:-6] + "Z"
 
-    if offset is not None and precision > FhirDtmPrecision.DAY:
+    # if precision is greater than day, and iso_dtm is midnight, we must append Z
+    if precision > FhirDtmPrecision.DAY and iso_dtm.endswith("T00:00:00"):
+        iso_dtm += "Z"
+        
+    # if precision is day, we must remove the time part
+    if precision == FhirDtmPrecision.DAY:
+        return iso_dtm[:precision]
+    else:
         return iso_dtm
-
-    return iso_dtm[ : precision]
 
 def post_process_fhir(json_data: str) -> Any:
     """post_process_fhir Post processes the FHIR object
