@@ -10,7 +10,7 @@ from pyjson5 import Json5Exception
 from pytest import raises
 
 from fhir_converter.tags import EvaluateNode, MergeDiffNode, all_tags, register_tags
-
+from fhir_converter.expressions import parse_loop_expression
 
 def get_template(
     source: str,
@@ -315,3 +315,20 @@ class EvaluateTest(TestCase):
         )
 
         self.assertEqual(template.render(val={'10':'test'}), "test")
+
+class HL7v2LoopTest(TestCase):
+
+    
+    
+    def get_hl7v2_template(
+        self,
+        source: str,
+        register: bool = True,
+        loader: Optional[BaseLoader] = None,
+    ) -> BoundTemplate:
+        env = Environment(loader=loader)
+        env.parse_loop_expression_value = parse_loop_expression
+        if register:
+            register_tags(env, all_tags)
+        return env.from_string(source)
+    

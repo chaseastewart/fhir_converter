@@ -219,9 +219,9 @@ def to_fhir_dtm(dt: datetime, precision: Optional[FhirDtmPrecision] = None) -> s
     # if precision is greater than day, and iso_dtm is midnight, we must append Z
     if precision > FhirDtmPrecision.DAY and iso_dtm.endswith("T00:00:00"):
         iso_dtm += "Z"
-        
+
     # if precision is day, we must remove the time part
-    if precision == FhirDtmPrecision.DAY:
+    if precision <= FhirDtmPrecision.DAY:
         return iso_dtm[:precision]
     else:
         return iso_dtm
