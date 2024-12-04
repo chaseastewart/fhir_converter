@@ -1,5 +1,8 @@
 # Python FHIR Converter Change Log
 
+## Version 0.4.0
+- Add support for HL7v2 to FHIR conversion. See [#12](https://github.com/chaseastewart/fhir-converter/pull/12)
+
 ## Version 0.3.0
 - Render narrative text from the CDA to xhtml to include in the Composition resource. See [#11](https://github.com/chaseastewart/fhir-converter/issues/11)
 - Fix bug in CDA to R4 Immunization template to correctly map lotNumberText to lotNumber.

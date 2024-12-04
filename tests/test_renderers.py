@@ -8,7 +8,7 @@ from unittest import TestCase
 from liquid import FileExtensionLoader
 from liquid.utils import LRUCache
 from lxml.etree import XMLSyntaxError
-from pyjson5 import Json5EOF
+from json5 import JSON5DecodeError
 from pytest import raises
 
 from fhir_converter.hl7 import get_ccda_section
@@ -89,7 +89,7 @@ class Stu3FhirRendererTest(TestCase):
     def test_render_fhir_string_json_error(self) -> None:
         with raises(RenderingError, match="Failed to render FHIR") as exc_info:
             Stu3FhirRenderer().render_fhir_string("Immunization", "")
-        self.assertIsInstance(exc_info.value.__cause__, Json5EOF)
+        self.assertIsInstance(exc_info.value.__cause__, JSON5DecodeError)
 
     def test_render_fhir_string_text(self) -> None:
         self._validate_str(
@@ -120,7 +120,7 @@ class Stu3FhirRendererTest(TestCase):
     def test_render_to_fhir_json_error(self) -> None:
         with raises(RenderingError, match="Failed to render FHIR") as exc_info:
             Stu3FhirRenderer().render_to_fhir("Immunization", "")
-        self.assertIsInstance(exc_info.value.__cause__, Json5EOF)
+        self.assertIsInstance(exc_info.value.__cause__, JSON5DecodeError)
 
     def test_render_to_fhir_text(self) -> None:
         self._validate(

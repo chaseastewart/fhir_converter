@@ -8,12 +8,7 @@ from liquid.context import Context
 from liquid.exceptions import LiquidSyntaxError
 from liquid.expression import Expression
 from liquid.expressions import TokenStream as ExprTokenStream
-from liquid.expressions.common import (
-    parse_string_or_identifier,
-    parse_unchained_identifier,
-)
 from liquid.expressions.filtered.lex import tokenize
-from liquid.expressions.filtered.parse import parse_obj
 from liquid.lex import _compile_rules, _tokenize, include_expression_rules
 from liquid.parse import expect, get_parser
 from liquid.stream import TokenStream
@@ -34,6 +29,9 @@ from liquid.token import (
     Token,
 )
 from liquid.undefined import is_undefined
+
+from fhir_converter.expressions.common import parse_unchained_identifier, parse_string_or_identifier, parse_obj
+
 from pyjson5 import encode_io
 from pyjson5 import loads as json_loads
 

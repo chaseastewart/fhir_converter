@@ -18,7 +18,7 @@
   },
   {% endif -%}
   "abatementBoolean" : "",
-  "stage" : [{{msg.stage | to_json_string | default : '""'}}],
+  "stage" : [msg.stage | to_json_string | default : '""'],
   "encounter" : {{msg.context | to_json_string | default : '""'}},
   "recordedDate" : "{{msg.assertedDate | date: "yyyy-MM-dd"}}",
   "assertedDate" : "",

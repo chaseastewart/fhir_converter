@@ -2,10 +2,10 @@ from pathlib import Path
 from unittest import TestCase
 
 from lxml import etree
-from pyjson5 import Json5EOF
+from json5 import JSON5DecodeError
 from pytest import raises
 
-from fhir_converter.parsers import ParseXmlOpts, parse_json, parse_xml
+from fhir_converter.parsers import ParseXmlOpts, parse_json, parse_xml, Hl7v2DataParser
 
 
 class ParseJsonTest(TestCase):
@@ -13,24 +13,24 @@ class ParseJsonTest(TestCase):
     simple_file = Path("tests/data/simple.json")
 
     def test_empty_text(self) -> None:
-        with raises(Json5EOF):
+        with raises(JSON5DecodeError):
             parse_json("")
 
     def test_blank_text(self) -> None:
-        with raises(Json5EOF):
+        with raises(JSON5DecodeError):
             parse_json(" ")
 
     def test_empty_bytes(self) -> None:
-        with raises(Json5EOF):
+        with raises(JSON5DecodeError):
             parse_json(bytes())
 
     def test_empty_text_io(self) -> None:
-        with raises(Json5EOF):
+        with raises(JSON5DecodeError):
             with self.empty_file.open() as json_in:
                 parse_json(json_in)
 
     def test_empty_binary_io(self) -> None:
-        with raises(Json5EOF):
+        with raises(JSON5DecodeError):
             with self.empty_file.open("rb") as json_in:
                 parse_json(json_in)
 
@@ -117,6 +117,14 @@ class ParseJsonTest(TestCase):
             {"name": [{"family": "", "given": [""]}]},
             parse_json(
                 '{"name": [{"family": "","given": [""]}]}', ignore_empty_fields=False
+            ),
+        )
+
+    def test_include_empty_fields_nested(self) -> None:
+        self.assertEqual(
+            {},
+            parse_json(
+                '{"name": [{"family": "","given": [""]}]}', ignore_empty_fields=True
             ),
         )
 
@@ -343,3 +351,24 @@ class ParseXmlTest(TestCase):
                 }
             },
         )
+
+class Hl7v2DataParserTest(TestCase):
+    def test_parse_hl7v2(self) -> None:
+        simple_file = Path("tests/data/hl7v2/ADT-A01-02.hl7")
+        with simple_file.open() as hl7v2_in:
+            hl7v2_str = hl7v2_in.read()
+        hl7v2_parser = Hl7v2DataParser()
+        hl7v2_data = hl7v2_parser.parse(hl7v2_str)
+
+        self.assertEqual(hl7v2_str, hl7v2_data.message)
+        # assert meta data = [MSH, EVN, PID, PV1]
+        meta_data = ["MSH", "EVN", "PID", "PV1"]
+        self.assertEqual(meta_data, hl7v2_data.meta)
+
+        # assert encoding_chars = ["^", "~", "&", "\\", "|"]
+        self.assertEqual("^", hl7v2_data.encoding_characters.component_separator)
+        self.assertEqual("~", hl7v2_data.encoding_characters.repetition_separator)
+        self.assertEqual("\\", hl7v2_data.encoding_characters.escape_character)
+        self.assertEqual("&", hl7v2_data.encoding_characters.subcomponent_separator)
+
+        # TODO: assert message_header = MSH

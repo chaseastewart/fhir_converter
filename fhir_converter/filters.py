@@ -6,13 +6,13 @@ from re import Match, Pattern
 from re import compile as re_compile
 from re import findall as re_findall
 from typing import Any, Callable, Final, Iterable, List, Mapping, Sequence, Tuple
-from uuid import UUID
+import uuid
 from zlib import compress as z_compress
 
 from dateutil import parser
 from frozendict import frozendict
 from isodate import isotzinfo, parse_datetime
-from liquid import Environment
+from liquid import Environment, Undefined
 from liquid.builtin.filters.misc import date as liquid_date
 from liquid.context import Context
 from liquid.exceptions import FilterArgumentError
@@ -40,6 +40,8 @@ from fhir_converter.utils import (
     to_list_or_empty,
     transform_xml_str,
 )
+
+from fhir_converter.parsers import Hl7v2Data, Hl7v2Segment, Hl7v2Field, Hl7v2Component
 
 FilterT = Callable[..., Any]
 """Callable[..., Any]: A liquid filter function"""
@@ -225,8 +227,47 @@ def generate_uuid(data: str) -> str:
     """Generate a UUID using the sha256 hash of the given data string"""
     if is_undefined_none_or_blank(data):
         return ""
-    return str(UUID(bytes=sha256(data.encode()).digest()[:16]))
+    data = data.strip().replace("\r", "").replace("\n", "")
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, data))
 
+@string_filter
+def generate_id_input(data: str, resource_name: str, based_id_required: bool, base_id: str = None) -> str:
+    """Generates an input string for generate_uuid with 1) the resource type, 2) whether a base ID is required, 3) the base ID (optional)"""
+    if isinstance(resource_name, Undefined):
+        resource_name = ""
+    if isinstance(based_id_required, Undefined):
+        based_id_required = False
+    if isinstance(base_id, Undefined):
+        base_id = ""
+
+    if based_id_required:
+        return resource_name + data + base_id
+    return resource_name + data
+
+@string_filter
+def sign(data:str) -> str:
+    """Sign the given data string"""
+    if is_undefined_none_or_blank(data):
+        return ""
+    # cast string as integer or float, if negative return -1, if positive return 1
+    return str(int(float(data)/abs(float(data))) if float(data) != 0 else 0)
+
+@string_filter
+def divide(data:str, divisor:str) -> str:
+    """Divide the given data string by the divisor string"""
+    if is_undefined_none_or_blank(data) or is_undefined_none_or_blank(divisor):
+        return ""
+    # if divisor is 0, return 0
+    if float(divisor) == 0:
+        return "0"
+    return str(float(data)/float(divisor))
+
+@string_filter
+def truncate_number(data: str) -> str:
+    """Truncate the given data string to the specified precision"""
+    if is_undefined_none_or_blank(data):
+        return ""
+    return f"{float(data):.{0}f}"
 
 @with_context
 @string_filter
@@ -372,6 +413,127 @@ def transform_narrative(text: str, *, context: Context) -> Mapping:
         },
     }
 
+@liquid_filter
+def get_first_segments(hl7v2_data: Hl7v2Data, segment_id_content : str) -> dict:
+    result = {}
+    segment_ids = segment_id_content.split("|")
+    for i in range(len(hl7v2_data.meta)):
+        if hl7v2_data.meta[i] in segment_ids and hl7v2_data.meta[i] not in result:
+            result[hl7v2_data.meta[i]] = _segment_to_dict(hl7v2_data.data[i])
+    return result
+
+@liquid_filter
+def get_segment_lists(hl7v2_data, segment_id_content):
+    segment_ids = segment_id_content.split("|")
+    return _get_segment_lists_internal(hl7v2_data, segment_ids)
+
+@liquid_filter
+def get_related_segment_list(hl7v2_data, parent_segment, child_segment_id):
+    result = {}
+    segments = []
+    parent_found = False
+    child_index = -1
+
+    for i in range(len(hl7v2_data.meta)):
+        if _segment_to_dict(hl7v2_data.data[i]) == parent_segment:
+            parent_found = True
+        elif hl7v2_data.meta[i].lower() == child_segment_id.lower() and parent_found:
+            child_index = i
+            break
+
+    if child_index > -1:
+        while child_index < len(hl7v2_data.meta) and hl7v2_data.meta[child_index].lower() == child_segment_id.lower():
+            segments.append(_segment_to_dict(hl7v2_data.data[child_index]))
+            child_index += 1
+
+        result[child_segment_id] = segments
+
+    return result
+
+@liquid_filter
+def get_parent_segment(hl7v2_data, child_segment_id, child_index, parent_segment_id):
+    result = {}
+    target_child_index = -1
+    found_child_segment_count = -1
+
+    for i in range(len(hl7v2_data.meta)):
+        if hl7v2_data.meta[i].lower() == child_segment_id.lower():
+            found_child_segment_count += 1
+            if found_child_segment_count == child_index:
+                target_child_index = i
+                break
+
+    for i in range(target_child_index, -1, -1):
+        if hl7v2_data.meta[i].lower() == parent_segment_id.lower():
+            result[parent_segment_id] = _segment_to_dict(hl7v2_data.data[i])
+            break
+
+    return result
+
+@liquid_filter
+def has_segments(hl7v2_data, segment_id_content):
+    segment_ids = segment_id_content.split("|")
+    segment_lists = _get_segment_lists_internal(hl7v2_data, segment_ids)
+    return all(segment_id in segment_lists for segment_id in segment_ids)
+
+@liquid_filter
+def split_data_by_segments(hl7v2_data: Hl7v2Data, segment_id_separators):
+    results = []
+    segment_ids = set(segment_id_separators.split("|"))
+
+    if segment_id_separators == "" or not set(hl7v2_data.meta).intersection(segment_ids):
+        results.append(hl7v2_data)
+        return results
+
+    for i in range(len(hl7v2_data.meta)):
+        if hl7v2_data.meta[i] in segment_ids:
+            result= Hl7v2Data(hl7v2_data.message)
+            result.meta.append(hl7v2_data.meta[i])
+            result.data.append(hl7v2_data.data[i])
+            results.append(result)
+
+    return results
+
+
+def _get_segment_lists_internal(hl7v2_data, segment_ids):
+    result = {}
+    for i in range(len(hl7v2_data.meta)):
+        if hl7v2_data.meta[i] in segment_ids:
+            if hl7v2_data.meta[i] in result:
+                result[hl7v2_data.meta[i]].append(_segment_to_dict(hl7v2_data.data[i]))
+            else:
+                result[hl7v2_data.meta[i]] = [_segment_to_dict(hl7v2_data.data[i])]
+    return result
+
+def _segment_to_dict(hl7v2_segment : Hl7v2Segment) -> dict:
+    result = {}
+    result['Value'] = hl7v2_segment.normalized_text
+    for i, field in enumerate(hl7v2_segment.fields):
+        result[str(i)] = _field_to_dict(field)
+    return result if result != {} else None
+
+def _field_to_dict(hl7v2_field : Hl7v2Field) -> dict:
+    result = {}
+    if hl7v2_field:
+        result['Value'] = hl7v2_field.value
+        if hl7v2_field.repeats is not None and len(hl7v2_field.repeats) > 0:
+            result['Repeats'] = []
+            for i, repeat in enumerate(hl7v2_field.repeats):
+                result['Repeats'].append(_field_to_dict(repeat))
+        for i, component in enumerate(hl7v2_field.components):
+            result[str(i)] = _component_to_dict(component)
+    return result if result != {} else None
+
+def _component_to_dict(hl7v2_component : Hl7v2Component) -> dict:
+    result = {}
+    if hl7v2_component:
+        result['Value'] = hl7v2_component.value
+        if (hl7v2_component.subcomponents is not None
+            and isinstance(hl7v2_component.subcomponents, list)):
+            for i, subcomponent in enumerate(hl7v2_component.subcomponents):
+                if subcomponent != hl7v2_component.value:
+                    result[str(i)] = subcomponent
+    return result if result != {} else None
 
 all_filters: Sequence[Tuple[str, FilterT]] = [
     ("to_json_string", to_json_string),
@@ -389,6 +551,16 @@ all_filters: Sequence[Tuple[str, FilterT]] = [
     ("get_ccda_section_by_template_id", get_ccda_section_by_template_id),
     ("batch_render", batch_render),
     ("transform_narrative", transform_narrative),
+    ("get_first_segments", get_first_segments),
+    ("get_segment_lists", get_segment_lists),
+    ("generate_id_input", generate_id_input),
+    ("has_segments", has_segments),
+    ("get_related_segment_list", get_related_segment_list),
+    ("get_parent_segment", get_parent_segment),
+    ("sign", sign),
+    ("divide", divide),
+    ("truncate_number", truncate_number),
+    ("split_data_by_segments", split_data_by_segments)
 ]
 """Sequence[tuple[str, FilterT]]: All of the filters provided by the module"""
 

@@ -10,7 +10,7 @@ from pyjson5 import Json5Exception
 from pytest import raises
 
 from fhir_converter.tags import EvaluateNode, MergeDiffNode, all_tags, register_tags
-
+from fhir_converter.expressions import parse_loop_expression
 
 def get_template(
     source: str,
@@ -166,12 +166,14 @@ class EvaluateTest(TestCase):
     single_arg = "{% evaluate var using 'single_arg' arg1: val -%}{{ var }}"
     missing_comma = "{% evaluate var using 'multi_arg' arg1: val1 arg2: val2 -%}"
     multi_arg = "{% evaluate var using 'multi_arg' arg1: val1, arg2: val2 -%}{{ var }}"
+    hl7v2_arg = "{% evaluate var using 'hl7v2' arg1: val.\"10\" -%}{{ var }}"
 
     loader = DictLoader(
         {
             "no_arg": "ok",
             "single_arg": "{{ arg1 }}",
             "multi_arg": "{{ arg1 }}, {{ arg2 }}",
+            "hl7v2": "{{ arg1 }}"
         }
     )
 
@@ -278,3 +280,55 @@ class EvaluateTest(TestCase):
         )
 
         self.assertEqual(template.render(val1="test", val2="ok"), "test, ok")
+
+    def test_hl7v2_arg(self) -> None:
+        template = get_template(source=self.hl7v2_arg, loader=self.loader)
+        self.assertEqual(len(template.tree.statements), 2)
+
+        node = template.tree.statements[0]
+        self.assertIsInstance(node, EvaluateNode)
+        self.assertEqual(
+            str(node),
+            "evaluate(var using 'hl7v2', arg1=val.10)",
+        )
+        self.assertEqual(
+            node.children(),
+            [
+                ChildNode(
+                    linenum=1,
+                    expression=StringLiteral(value="hl7v2"),
+                    template_scope=["var"],
+                    block_scope=["arg1"],
+                    load_mode="include",
+                    load_context={"tag": "evaluate"},
+                ),
+                ChildNode(
+                    linenum=1,
+                    expression=Identifier(
+                        path=[
+                            IdentifierPathElement(value="val"),
+                            IdentifierPathElement(value="10"),
+                        ]
+                    ),
+                ),
+            ],
+        )
+
+        self.assertEqual(template.render(val={'10':'test'}), "test")
+
+class HL7v2LoopTest(TestCase):
+
+    
+    
+    def get_hl7v2_template(
+        self,
+        source: str,
+        register: bool = True,
+        loader: Optional[BaseLoader] = None,
+    ) -> BoundTemplate:
+        env = Environment(loader=loader)
+        env.parse_loop_expression_value = parse_loop_expression
+        if register:
+            register_tags(env, all_tags)
+        return env.from_string(source)
+    

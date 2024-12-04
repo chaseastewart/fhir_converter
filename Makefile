@@ -1,7 +1,7 @@
 .PHONY : env update-lock install test cov type-check linting-check docs publish init update build publish
 .DEFAULT_GOAL := init
 
-PY_PATH = 3.12
+PY_PATH = 3.11
 
 env :
 	poetry env use '$(PY_PATH)'

@@ -1,9 +1,10 @@
 from io import BytesIO
+from os import path as os_path
 from os import PathLike
 from os import remove as os_remove
 from os import walk as os_walk
 from pathlib import Path
-from re import Pattern
+from re import Pattern, sub as re_sub
 from re import compile as re_compile
 from typing import IO, Any, Dict, Final, Generator, List, Optional, Tuple, Union
 
@@ -392,3 +393,45 @@ def transform_xml_str(xslt: etree.XSLT, xml: str) -> str:
             )
         )
     )
+
+def escape_liquid_variable(value: Path) -> str:
+    """escape_liquid_variable Escapes with quotes the integer in variables name
+
+    Args:
+        value (Path): the file to read
+
+    Returns:
+        str: the escaped integer
+    """
+    with open(value, mode="r", encoding="utf-8") as file:
+        to_process = file.read()
+    # for each line in the file
+    # if the line contains a variable name with an integer ( e.g. a number prefixed with a . (dot) )
+    # escape the integer with quotes (e.g. .1 -> . "1")
+    return re_sub(r"\.(\d+)", r'."\1"', to_process)
+
+def process_liquid_folder_escape_variable(folder_in: Path, folder_out: Path) -> None:
+    """process_liquid_folder_escape_variable Processes the liquid files 
+    by walking all sub directory from the input folder and escaping the 
+    integer in the variable name and writes the output to the output folder
+    if the output folder does not exist it will be created, it will keep the
+    same directory structure as the input
+
+    Args:
+        folder_in (Path): the input folder
+        folder_out (Path): the output folder
+    """
+
+    for full_paths, dirs, filenames in walk_path(folder_in):
+        for filename in filenames:
+            in_file = full_paths.joinpath(filename)
+            out_file = Path(os_path.join(folder_out, os_path.relpath(in_file, folder_in)))
+            if not out_file.parent.is_dir():
+                out_file.parent.mkdir(parents=True)
+            with open(out_file, mode="w", encoding="utf-8") as out:
+                out.write(escape_liquid_variable(in_file))
+
+
+if __name__ == '__main__':
+    process_liquid_folder_escape_variable(Path("fhir_converter/templates/hl7v2_orgi"), Path("fhir_converter/templates/hl7v2"))
+    print("Done")

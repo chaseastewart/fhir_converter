@@ -15,9 +15,9 @@
   ],
   {% if msg.availability == 'OFFLINE' or msg.availability == 'UNAVAILABLE' -%}
   "status" : "registered",
-  {% elseif msg.availability == 'ONLINE' or msg.availability == 'NEARLINE' -%}
+  {% elsif msg.availability == 'ONLINE' or msg.availability == 'NEARLINE' -%}
   "status" : "available",
-  {% elseif msg.availability == null -%}
+  {% elsif msg.availability == null -%}
   "status" : "unknown",
   {% endif -%}
   "modality" : {{msg.modalityList | to_json_string | default : '""'}},

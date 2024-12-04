@@ -17,8 +17,8 @@
     {% endif -%}
   ],
   "requester" : {{msg.requester.agent | to_json_string | default : '""'}},
-  "reasonCode" : [{{msg.reasonCodeableConcept | to_json_string | default : '""' }}],
-  "reasonReference" : [{{msg.reasonReference | to_json_string | default : '""' }}],
+  "reasonCode" : [msg.reasonCodeableConcept | to_json_string | default : '""' ],
+  "reasonReference" : [msg.reasonReference | to_json_string | default : '""' ],
   "reasonCodeableConcept" : "",
   "orderedItem" : ""
 }

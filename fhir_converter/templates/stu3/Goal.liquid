@@ -4,9 +4,9 @@
   {% assign value = msg.status %}
   {% if value == 'proposed' or value == 'planned' or value == 'accepted' or value == 'on-hold' or value == 'cancelled' or value == 'entered-in-error' or value == 'rejected' -%}
   "lifecycleStatus" : "{{value}}",
-  {% elseif value == 'achieved' -%}
+  {% elsif value == 'achieved' -%}
   "lifecycleStatus" : "completed",
-  {% elseif value == 'in-progress' or value == 'sustaining' -%}
+  {% elsif value == 'in-progress' or value == 'sustaining' -%}
   "lifecycleStatus" : "active",
   "achievementStatus" : {
     "coding" : [
@@ -16,7 +16,7 @@
       }
     ]
   },
-  {% elseif value == 'on-target' -%}
+  {% elsif value == 'on-target' -%}
   "lifecycleStatus" : "active",
   "achievementStatus" : {
     "coding" : [
@@ -26,7 +26,7 @@
       }
     ]
   },
-  {% elseif value == 'ahead-of-target' -%}
+  {% elsif value == 'ahead-of-target' -%}
   "lifecycleStatus" : "active",
   "achievementStatus" : {
     "coding" : [
@@ -36,7 +36,7 @@
       }
     ]
   },
-  {% elseif value == 'behind-target' -%}
+  {% elsif value == 'behind-target' -%}
   "lifecycleStatus" : "active",
   "achievementStatus" : {
     "coding" : [
@@ -47,7 +47,7 @@
     ]
   },
   {% endif -%}
-  "target" : [{{msg.target | to_json_string | default : '""'}}],
+  "target" : [msg.target | to_json_string | default : '""'],
   "status" : ""
 }
 {% endmergeDiff -%}

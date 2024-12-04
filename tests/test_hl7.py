@@ -248,13 +248,13 @@ class Hl7ToFhirDtmTest(TestCase):
         )
 
     def test_local_hour(self) -> None:
-        self.assertEqual("2024-02-10", hl7_to_fhir_dtm("2024021006"))
+        self.assertEqual("2024-02-10T06:00:00Z", hl7_to_fhir_dtm("2024021006"))
 
     def test_local_min(self) -> None:
-        self.assertEqual("2024-02-10", hl7_to_fhir_dtm("202402100635"))
+        self.assertEqual("2024-02-10T06:35:00Z", hl7_to_fhir_dtm("202402100635"))
 
     def test_local_sec(self) -> None:
-        self.assertEqual("2024-02-10", hl7_to_fhir_dtm("20240210063557"))
+        self.assertEqual("2024-02-10T06:35:57Z", hl7_to_fhir_dtm("20240210063557"))
 
     def test_tz_utc(self) -> None:
         self.assertEqual(
