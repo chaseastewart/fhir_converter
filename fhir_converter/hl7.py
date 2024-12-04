@@ -196,35 +196,50 @@ def to_fhir_dtm(dt: datetime, precision: Optional[FhirDtmPrecision] = None) -> s
     """to_fhir_dtm Converts the given datetime to an ISO equivalent string optionally
     truncating the precision to the provided specifity
 
-    Precision:
-    Hour, Minute and Second truncation is not implemented
-
     Args:
         dt (datetime): The datetime
         precision (Optional[FhirDtmPrecision], optional): The FHIR precision. When None
         is provided, SEC will be used. Defaults to None
 
     Returns:
-        The ISO date time string
+        The ISO date time string matching the pattern:
+        ([0-9]([0-9]([0-9][1-9]|[1-9]0)|[1-9]00)|[1-9]000)
+        (-(0[1-9]|1[0-2])(-(0[1-9]|[1-2][0-9]|3[0-1])
+        (T([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60)(\.[0-9]+)?
+        (Z|(\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00)))?)?)?
     """
     if precision is None:
         precision = FhirDtmPrecision.DAY
 
-    iso_dtm, offset = dt.isoformat(timespec=precision.timespec), dt.utcoffset()
+    date_str = f"{dt.year:04d}"
+    
+    if precision >= FhirDtmPrecision.MONTH:
+        date_str += f"-{dt.month:02d}"
+        
+    if precision >= FhirDtmPrecision.DAY:
+        date_str += f"-{dt.day:02d}"
+        
+    if precision >= FhirDtmPrecision.HOUR:
+        date_str += f"T{dt.hour:02d}:{dt.minute:02d}:{dt.second:02d}"
+        
+        if precision >= FhirDtmPrecision.MILLIS and dt.microsecond:
+            date_str += f".{dt.microsecond // 1000:03d}"  # Truncate to milliseconds
+            
+        offset = dt.utcoffset()
+        if offset is not None and offset != zero_time_delta:
+            minutes = offset.total_seconds() / 60
+            hours = int(abs(minutes) / 60)
+            mins = int(abs(minutes) % 60)
+            sign = '-' if minutes < 0 else '+'
+            if hours == 14 and mins == 0:
+                date_str += f"{sign}14:00"
+            elif hours < 14:
+                date_str += f"{sign}{hours:02d}:{mins:02d}"
+        else:
+            date_str += "Z"
 
-    # if offset is zero, we must append Z instead of +00:00
-    if offset == zero_time_delta:
-        iso_dtm = iso_dtm[:-6] + "Z"
+    return date_str
 
-    # if precision is greater than day, and iso_dtm is midnight, we must append Z
-    if precision > FhirDtmPrecision.DAY and iso_dtm.endswith("T00:00:00"):
-        iso_dtm += "Z"
-
-    # if precision is day, we must remove the time part
-    if precision <= FhirDtmPrecision.DAY:
-        return iso_dtm[:precision]
-    else:
-        return iso_dtm
 
 def post_process_fhir(json_data: str) -> Any:
     """post_process_fhir Post processes the FHIR object
